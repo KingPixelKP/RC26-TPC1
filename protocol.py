@@ -1,16 +1,6 @@
-"""
-67775   Gabriel Matias
-68130   Dinis Neves
-"""
-
-import threading
-import os
 import pickle
-import sys
-import socket as s
 from socket import *
 
-serverPort : int = 12000
 SOCKET_BUFFER : int = 1024
 SIZE : int = 512
 
@@ -18,9 +8,6 @@ SIZE : int = 512
 ## Start Server
 SERVER_RUNNING : str = "Server is running"
 SERVER_NOT_START : str = "Unable to start server"
-
-## Recieve client
-WELCOME_CLIENT : str = "Welcome to {} file server"
 
 ## Errors
 FILE_NOT_FOUND : str = "ERROR: File not found"
@@ -34,9 +21,6 @@ DATA_OP : int = 3
 ACKNOWLEDGE_OP : int = 4
 ERROR_OP : int = 5
 
-
-
-### Protocol
 def close_program(socket : socket):
     socket.close()
     exit()
@@ -114,82 +98,3 @@ def recv_request(socket : socket) -> str:
     (_, file_name) = pickle.loads(req)
 
     return file_name
-
-
-### End of Protocol
-
-
-
-## Server Functions
-
-# Function to handle client, called always with a new threaded
-def handle_client(socket : socket, client_address : str, server_address : str):
-  try:
-    welcome_message = WELCOME_CLIENT.format(server_address)
-    send_data_block(0, len(welcome_message), welcome_message, socket)
-    recv_acknowledge_block(0, socket)
-    while True:
-      file_name = recv_request(socket)
-
-      if file_name == "":
-        dir_command(socket)
-      else:
-        get_command(file_name, socket)
-  except EOFError:
-     print("Client: {} has disconected or suffered an error".format(client_address))
-    
-
-
-# Function to do the dir command
-def dir_command(socket : socket):
-  dir_path = "."
-  dir_list = os.listdir(dir_path)
-
-      ## send to client
-  block = 0
-  for x in dir_list:
-     send_data_block(block, len(x), x, socket)
-     recv_acknowledge_block(block, socket)
-     block = block + 1
-
-  send_data_block(block, 0, "", socket)
-  recv_acknowledge_block(block, socket)
-
-
-# Function to do the get command server side
-def get_command(fName : str, socket : socket):
-    try: 
-      f = open(fName, "r")
-      data = f.read(SIZE)
-      block = 0
-
-      while (data):
-        send_data_block(block, len(data), data, socket)
-        recv_acknowledge_block(block, socket)
-        block = block + 2
-        data = f.read(SIZE)
-    except OSError:
-       send_error_block(FILE_NOT_FOUND, socket)
-       print(FILE_NOT_FOUND)
-
-
-def main():
-  serverSocket = s.socket(AF_INET,SOCK_STREAM)
-  try:
-
-    serverSocket.bind(("", int(sys.argv[1])))
-  
-    serverSocket.listen(5)
-    print("Server running on port {}, {}".format(sys.argv[1], serverSocket.getsockname()))
-    while True:
-        # Thread to recieve new clients
-        socket, addr = serverSocket.accept()
-        print('Connected to:', addr[0], ':', addr[1])
-        tid = threading.Thread(target=handle_client, args = (socket, addr[0], serverSocket.getsockname()[0]))
-        tid.start()
-  except KeyboardInterrupt:
-      print("User Interrupt detected closing program!!")
-      close_program(serverSocket)
-
-if __name__ == "__main__":
-    main()
