@@ -1,5 +1,5 @@
 """
-67775   Gab
+67775   Gabriel Matias
 68130   Dinis Neves
 """
 from socket import *
@@ -69,6 +69,8 @@ def recv_request(socket : socket) -> str:
     if op_code == ERROR_OP:
         recv_error(rec, socket)
     return file_name
+
+
 
 
 
