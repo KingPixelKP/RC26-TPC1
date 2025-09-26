@@ -9,7 +9,7 @@ import os
 import pickle
 
 serverPort : int = 12000
-socketBuffer : int = 1024
+SOCKET_BUFFER : int = 1024
 SIZE : int = 512
 
 
@@ -29,57 +29,100 @@ FILE_NOT_FOUND : str = "File not found"
 REQUET_FILE_OP : int = 1
 DATA_OP : int = 3
 ACKNOWLEDGE_OP : int = 4
+ERROR_OP : int = 5
 
-
-
-
-
+def close_program(socket : socket):
+    socket.close()
+    exit()
 
 def send_acknowledge_block(block : int, socket : socket):
     acknowledge = (ACKNOWLEDGE_OP, block)
     ack = pickle.dumps(acknowledge)
     socket.send(ack)
 
+def recv_acknowledge_block(block : int, socket : socket):
+    ack = socket.recv(SOCKET_BUFFER)
+    (op_code, acknowledged_block) = pickle.loads(ack)
+
+    if op_code == ERROR_OP:
+        recv_error(ack, socket)
+
+    if acknowledged_block != block:
+        print("Wrong block acknowledged: ACK")
+
+def recv_error(req : bytes, socket : socket):
+    (_, error_string) = pickle.loads(req)
+    print(error_string)
+    close_program()
+
+
+def send_data_block(block : int, size : int, data : str, socket : socket):
+   data_tuple = (DATA_OP, block, size, data)
+   dat = pickle.dumps(data_tuple)
+   socket.send(dat)
+   
+
+def recv_request(socket : socket) -> str:
+    rec = socket.recv(SOCKET_BUFFER)
+    (op_code, file_name) = pickle.loads(rec)
+
+    if op_code == ERROR_OP:
+        recv_error(rec, socket)
+    return file_name
 
 
 
 # Function to handle client, called always with a new threaded
-def handle_client(c):
+def handle_client(socket : socket):
   while True:
-    data = c.recv(1024)
-    dataD = data.decode()
-    if not dataD:
-      print('Bye')
-      break
-    time.sleep(5)
-    print("received from client: ", dataD)    
-    c.send(data)
-  c.close()
+    file_name = recv_request(socket)
+
+    if file_name == "":
+      dir_command(socket)
+    else:
+      get_command(file_name, socket)
 
 
 # Function to do the dir command
-def dir_command():
-   dir_path = "."
-   dir_list = os.listdir(dir_path)
+def dir_command(socket : socket):
+  dir_path = "."
+  dir_list = os.listdir(dir_path)
+
       ## send to client
-    
-   for x in dir_list:
-      print(x)
+  block = 0
+  for x in dir_list:
+     send_data_block(block, len(x), x, socket)
+     recv_acknowledge_block(block, socket)
+     block = block + 1
+     break
+  send_data_block(block, 0, "", socket)
+  recv_acknowledge_block(block, socket)
+
+  
+  
+  
+   
 
 
 # Function to do the get command server side
-def get_command(fName):
+def get_command(fName : str, socket : socket):
     try: 
-      f = open(fName, "rb")
+      f = open(fName, "r")
     except:
        print(FILE_NOT_FOUND)
     
     data = f.read(SIZE)
+    block = 0
     while (data):
-       ## send to client
-       sdata : tuple = (DATA_OP, data)
-       ssdat = pickle.dumps(sdata)
-       socket.send(ssdat)
+      send_data_block(block, len(data), data, socket)
+      recv_acknowledge_block(block, socket)
+      block = block + 1
+      data = f.read(SIZE)
+    
+
+
+       
+ 
 
 
 ## end ???
@@ -101,14 +144,15 @@ def main():
 
 
 
+
     while True:
 
 
 
         # Thread to recieve new clients
-        c, addr = serverSocket.accept()
+        socket, addr = serverSocket.accept()
         print('Connected to:', addr[0], ':', addr[1])
-        tid = threading.Thread(target=handle_client, args = (c,))
+        tid = threading.Thread(target=handle_client, args = (socket,))
         
         break
     
