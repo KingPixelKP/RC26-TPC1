@@ -27,6 +27,11 @@ USER_INTERRUPT : str = "\nProgram interrupted by user closing connection."
 REQUET_FILE_OP : int = 1
 DATA_OP : int = 3
 ACKNOWLEDGE_OP : int = 4
+ERROR_OP : int = 5
+
+def close_program(socket : socket):
+    socket.close()
+    exit()
 
 def send_acknowledge_block(block : int, socket : socket):
     acknowledge = (ACKNOWLEDGE_OP, block)
@@ -38,6 +43,30 @@ def send_request(file_name : str, socket : socket):
     req = pickle.dumps(request)
     socket.send(req)
 
+def recv_error(req : bytes, socket : socket):
+    (_, error_string) = pickle.loads(req)
+    print(error_string)
+    close_program()
+
+
+def recv_acknowledge_block(block : int, socket : socket):
+    ack = socket.recv(SOCKET_BUFFER)
+    (op_code, acknowledged_block) = pickle.loads(ack)
+
+    if op_code == ERROR_OP:
+        recv_error(ack, socket)
+
+    if acknowledged_block != block:
+        print("Wrong block acknowledged: ACK")
+
+def recv_data(socket : socket) -> tuple[int, int, int , bytes]:
+    req = socket.recv(SOCKET_BUFFER)
+    (op_code, _, _, _) = pickle.loads(req)
+
+    if op_code == ERROR_OP:
+        recv_error(req, socket)
+
+    return pickle.loads(req)
 
 def get_command(line : str, client_socket : socket):
     if (len(line.split()) != 3):
@@ -48,27 +77,38 @@ def get_command(line : str, client_socket : socket):
 
     send_request(server_file, client_socket)
     
-    file_size : int
-    file_size =  int(client_socket.recv(SOCKET_BUFFER).decode())
+    message_size : int
+    (_, block, _, message_size_data) = recv_data(client_socket)
+    send_acknowledge_block(block, client_socket)
+    message_size = int(message_size_data)
 
     received_size : int = 0
 
     file = open(client_file, "wb")
 
-    while received_size < file_size:
-        req = client_socket.recv(SOCKET_BUFFER)
-        (op_code, block, size, data) = pickle.loads(req)
-
-        if op_code != DATA_OP:
-            print("Error")
-        
+    while received_size < message_size:
+        (_, block, size, data) = recv_data(client_socket)
         send_acknowledge_block(block, client_socket)
-
         file.write(data)
         received_size = received_size + size
         
     file.close()
 
+def dir_command(client_socket : socket):
+
+    file_size : int
+    (_, block, _, file_size_data) = recv_data(client_socket)
+    send_acknowledge_block(block, client_socket)
+    file_size = int(file_size_data)
+
+    received_size : int = 0
+
+    while received_size < file_size:
+        (_, block, size, data) = recv_data(client_socket)
+        send_acknowledge_block(block, client_socket)
+        print(data)
+        received_size = received_size + size
+    
 
 def main():
     try: 
@@ -81,12 +121,13 @@ def main():
 
         client_socket = socket(AF_INET,SOCK_STREAM)
 
-        #client_socket.connect((server_ip, server_port))
+        client_socket.connect((server_ip, server_port))
 
-        #welcome_message = client_socket.recv().decode()
+        (_, block, _, welcome_message) = recv_data(client_socket)
+        send_acknowledge_block(block, client_socket)
 
         print("Connect to server")
-        #print(welcome_message)
+        print(welcome_message)
 
         line : str
         cmd : str
@@ -98,13 +139,13 @@ def main():
             if cmd == GET_CMD:
                 get_command(line, client_socket)
             elif cmd == DIR_CMD:
-                pass
+                dir_command(client_socket)
             elif cmd == END_CMD:
                 break
-
+        
 
     except KeyboardInterrupt:
-        print(USER_INTERRUPT)
+        close_program()
 
 if __name__ == "__main__":
     main()
