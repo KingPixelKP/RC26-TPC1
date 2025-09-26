@@ -2,9 +2,9 @@
 67775   Gab
 68130   Dinis Neves
 """
+
 from socket import *
 import threading
-import time
 import os
 import pickle
 
@@ -98,12 +98,6 @@ def dir_command(socket : socket):
   send_data_block(block, 0, "", socket)
   recv_acknowledge_block(block, socket)
 
-  
-  
-  
-   
-
-
 # Function to do the get command server side
 def get_command(fName : str, socket : socket):
     try: 
@@ -118,42 +112,19 @@ def get_command(fName : str, socket : socket):
       recv_acknowledge_block(block, socket)
       block = block + 1
       data = f.read(SIZE)
-    
-
-
-       
- 
-
-
-## end ???
-'''client closes socket but  server keep going'''
    
-
-
-
 def main():
 
-    # Welcoming socket and listen for requests
-    host = ''
-    port = 12345
     serverSocket = socket(AF_INET, SOCK_STREAM)
     serverSocket.bind(("", serverPort))
-    serverSocket.listen(5)
-    print("Server running on port", port)
-
-
-
-
 
     while True:
 
-
-
         # Thread to recieve new clients
-        socket, addr = serverSocket.accept()
+        connSocket, addr = serverSocket.accept()
         print('Connected to:', addr[0], ':', addr[1])
-        tid = threading.Thread(target=handle_client, args = (socket,))
-        
-        break
-    
-main()
+        tid = threading.Thread(target=handle_client, args = (connSocket,))
+        tid.start()
+
+if __name__ == '__main__':
+  main()
