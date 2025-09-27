@@ -57,6 +57,7 @@ def send_acknowledge_block(block : int, socket : socket):
 def send_error_block(error : str, socket : socket):
   err = pickle.dumps((ERROR_OP, error))
   socket.send(err)
+  close_program(socket)
 
 
 def send_data_block(block : int, size : int, data : str, socket : socket):
@@ -144,8 +145,6 @@ def handle_client(socket : socket, client_address : str, server_address : str):
         get_command(file_name, socket)
   except EOFError:
      print("Client: {} has disconected or suffered an error".format(client_address))
-  except BrokenPipeError:
-     print("Client: {} has disconected or suffered an error".format(client_address))
      
     
 
@@ -173,18 +172,14 @@ def get_command(fName : str, socket : socket):
       data = f.read(SIZE)
       block = 0
 
-
       while (data):
         send_data_block(block, len(data), data, socket)
         recv_acknowledge_block(block, socket)
         block = block + 1
         data = f.read(SIZE)
-        recv_acknowledge_block(block, socket)
-        
-        if not data:
-           break
     except OSError:
        send_error_block(FILE_NOT_FOUND, socket)
+       print(FILE_NOT_FOUND)
 
 
 def main():
