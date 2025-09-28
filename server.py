@@ -158,9 +158,23 @@ def dir_command(socket : socket):
       ## send to client
   block = 0
   for x in dir_list:
-     send_data_block(block, len(x), x, socket)
-     recv_acknowledge_block(block, socket)
-     block = block + 1
+
+    message : str
+
+    if os.path.isfile(x):
+       message = "File -> {}".format(x)
+    elif os.path.isdir(x):
+       message = "Directory -> {}".format(x)
+    elif os.path.islink(x):
+       message = "Link -> {}".format(x)
+    else:
+       message = "Unsorted -> {}".format(x)
+       
+     
+
+    send_data_block(block, len(message), message, socket)
+    recv_acknowledge_block(block, socket)
+    block = block + 1
 
   send_data_block(block, 0, "", socket)
   recv_acknowledge_block(block, socket)
@@ -174,13 +188,11 @@ def get_command(fName : str, socket : socket):
       block = 0
 
 
-      while (data):
+      while True:
         send_data_block(block, len(data), data, socket)
         recv_acknowledge_block(block, socket)
         block = block + 1
         data = f.read(SIZE)
-        recv_acknowledge_block(block, socket)
-        
         if not data:
            break
     except OSError:

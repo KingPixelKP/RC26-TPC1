@@ -148,7 +148,6 @@ def get_command(line : str, client_socket : socket):
 
     while True:
         (_, block, size, data) = recv_data(client_socket)
-        print("Received size: {}".format(size))
         
         if expected_block != block:
             send_error_block(PROTOCOL_ERR, client_socket)
@@ -158,7 +157,6 @@ def get_command(line : str, client_socket : socket):
         send_acknowledge_block(block, client_socket)
         file.write(data)
         expected_block = expected_block + 1
-        print("{} {}".format(block, data))
         if size < 512:
             break
         
@@ -200,16 +198,20 @@ def main():
 
         while True:
             line = input(PROMPT)
-            cmd = line.split()[0]
 
-            if cmd == GET_CMD:
-                get_command(line, client_socket)
-            elif cmd == DIR_CMD:
-                dir_command(client_socket)
-            elif cmd == END_CMD:
-                break
-            else:
+            if line == "":
                 print(UNK_CMD_ERR)
+            else:
+                cmd = line.split()[0]
+
+                if cmd == GET_CMD:
+                    get_command(line, client_socket)
+                elif cmd == DIR_CMD:
+                    dir_command(client_socket)
+                elif cmd == END_CMD:
+                    break
+                else:
+                    print(UNK_CMD_ERR)
         
 
     except KeyboardInterrupt:
