@@ -44,6 +44,11 @@ PROTOCOL_ERR_BLOCK : str = "ERROR: Protocol Error connection closed: Unexpected 
 PROTOCOL_ERR : str = "ERROR: Protocol Error connection closed: Unexpected Op_code, expected -> {}, found -> {}"
 ACKNOWLEDGE_ERR : str = "ERROR: Incorrect Acknowledge packet, expected -> {}; found -> {}"
 
+class ErrorException(Exception):
+    def __init__(self):
+        super().__init__(self)
+
+
 
 def close_program(socket : socket):
     socket.close()
@@ -80,7 +85,7 @@ def recv_acknowledge_block(block : int, socket : socket):
 
   if op_code == ERROR_OP:
       recv_error(ack)
-      raise IndexError
+      raise ErrorException
   
   if op_code != ACKNOWLEDGE_OP:
     send_error_block(PROTOCOL_ERR.format(ACKNOWLEDGE_OP, op_code), socket)
@@ -102,7 +107,7 @@ def recv_data(socket : socket) -> tuple[int, int, int , bytes]:
 
     if op_code == ERROR_OP:
       recv_error(req)
-      raise IndexError
+      raise ErrorException
 
     if op_code != DATA_OP:
       send_error_block(PROTOCOL_ERR.format(DATA_OP, op_code), socket)
@@ -117,7 +122,7 @@ def recv_request(socket : socket) -> str:
 
     if op_code == ERROR_OP:
       recv_error(req)
-      raise IndexError
+      raise ErrorException
 
     if op_code != REQUET_FILE_OP:
       send_error_block(PROTOCOL_ERR.format(REQUET_FILE_OP, op_code), socket)
@@ -146,7 +151,9 @@ def get_command(line : str, client_socket : socket):
     try:
         send_request(server_file, client_socket)
         
-        (_, block, size, data) = recv_data(client_socket)
+        (_, block, size, data) = recv_data(client_socket) #Used so that when used on the same machine the client may create the file too fast
+        # and thus the server may think the file exists and thus transfer a file with nothing to the client, this assures that the client may only create the file after
+        # receiving no errors (File not found)
 
         file = open(client_file, "wb")
 
@@ -167,7 +174,7 @@ def get_command(line : str, client_socket : socket):
             
         file.close()
 
-    except IndexError:
+    except ErrorException:
         try:
             os.remove(client_file)
         except FileNotFoundError:
@@ -196,7 +203,7 @@ def dir_command(client_socket : socket):
                 break
             print(data)
             
-    except:
+    except ErrorException:
         close_program(client_socket)
     
 
@@ -245,6 +252,8 @@ def main():
         close_program(client_socket)
     except ConnectionRefusedError:
         print(FAILED_CONNECT)
+        return
+    print("Connection closed, client ended")
 
 if __name__ == "__main__":
     main()

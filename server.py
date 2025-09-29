@@ -142,11 +142,8 @@ def handle_client(socket : socket, client_address : str, server_address : str):
         dir_command(socket)
       else:
         get_command(file_name, socket)
-  except EOFError:
-     print("Client: {} has disconected or suffered an error".format(client_address))
-  except BrokenPipeError:
-     print("Client: {} has disconected or suffered an error".format(client_address))
-  except ConnectionResetError:
+  except:
+     socket.close()
      print("Client: {} has disconected or suffered an error".format(client_address))
      
     
@@ -175,8 +172,6 @@ def get_command(fName : str, socket : socket):
     try: 
       f = open(fName, "rb")
       block = 0
-
-
       while True:
         data = f.read(SIZE)
         send_data_block(block, len(data), data, socket)
@@ -196,16 +191,19 @@ def main():
     serverSocket.bind(("", int(sys.argv[1])))
   
     serverSocket.listen(5)
-    print("Server running on port {}, {}".format(sys.argv[1], serverSocket.getsockname()))
+    print("Server running on port {}, {}".format(sys.argv[1], gethostbyname(gethostname())))
     while True:
         # Thread to recieve new clients
         socket, addr = serverSocket.accept()
         print('Connected to:', addr[0], ':', addr[1])
-        tid = threading.Thread(target=handle_client, args = (socket, addr[0], serverSocket.getsockname()[0]))
-        tid.start()
+        thread = threading.Thread(target=handle_client, args = (socket, addr[0], gethostbyname(gethostname())))
+        thread.daemon = True
+        thread.start()
   except KeyboardInterrupt:
       print(USER_INTERRUPT)
       close_program(serverSocket)
+  except: 
+     print("Unable to start server")
 
 if __name__ == "__main__":
     main()
