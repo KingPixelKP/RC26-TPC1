@@ -146,12 +146,13 @@ def get_command(line : str, client_socket : socket):
     try:
         send_request(server_file, client_socket)
         
+        (_, block, size, data) = recv_data(client_socket)
+
         file = open(client_file, "wb")
 
         expected_block = 0
 
         while True:
-            (_, block, size, data) = recv_data(client_socket)
             
             if expected_block != block:
                 send_error_block(PROTOCOL_ERR_BLOCK.format(expected_block, block), client_socket)
@@ -162,9 +163,15 @@ def get_command(line : str, client_socket : socket):
             if size < 512:
                 break
             
+            (_, block, size, data) = recv_data(client_socket)
+            
         file.close()
+
     except IndexError:
-        os.remove(client_file)
+        try:
+            os.remove(client_file)
+        except FileNotFoundError:
+            pass
         close_program(client_socket)
 
     print("File tranfer completed!!")
