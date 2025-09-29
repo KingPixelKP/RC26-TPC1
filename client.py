@@ -40,6 +40,7 @@ ACKNOWLEDGE_OP : int = 4
 ERROR_OP : int = 5
 
 ### Protocol
+PROTOCOL_ERR_BLOCK : str = "ERROR: Protocol Error connection closed: Unexpected block, expected -> {}, found -> {}"
 PROTOCOL_ERR : str = "ERROR: Protocol Error connection closed: Unexpected Op_code, expected -> {}, found -> {}"
 ACKNOWLEDGE_ERR : str = "ERROR: Incorrect Acknowledge packet, expected -> {}; found -> {}"
 
@@ -57,7 +58,8 @@ def send_acknowledge_block(block : int, socket : socket):
 def send_error_block(error : str, socket : socket):
   err = pickle.dumps((ERROR_OP, error))
   socket.send(err)
-  close_program(socket)
+  print(error)
+  raise IndexError
 
 
 def send_data_block(block : int, size : int, data : str, socket : socket):
@@ -70,11 +72,6 @@ def send_request(file_name : str, socket : socket):
     req = pickle.dumps(request)
     socket.send(req)
 
-def recv_error(req : bytes, socket : socket):
-    (_, error_string) = pickle.loads(req)
-    print(error_string)
-    close_program(socket)
-
 def recv_acknowledge_block(block : int, socket : socket):
   ack = socket.recv(SOCKET_BUFFER)
   tuple = pickle.loads(ack)
@@ -82,16 +79,20 @@ def recv_acknowledge_block(block : int, socket : socket):
   op_code = tuple[0]
 
   if op_code == ERROR_OP:
-    recv_error(ack, socket)
+      recv_error(ack)
+      raise IndexError
   
   if op_code != ACKNOWLEDGE_OP:
-     send_error_block(PROTOCOL_ERR.format(ACKNOWLEDGE_OP, op_code), socket)
+    send_error_block(PROTOCOL_ERR.format(ACKNOWLEDGE_OP, op_code), socket)
 
   (op_code, acknowledged_block) = pickle.loads(ack)
 
   if acknowledged_block != block:
     send_error_block(ACKNOWLEDGE_ERR.format(block, acknowledged_block), socket)
 
+def recv_error(req : bytes):
+    (_, error_string) = pickle.loads(req)
+    print(error_string)
 
 def recv_data(socket : socket) -> tuple[int, int, int , bytes]:
     req = socket.recv(SOCKET_BUFFER)
@@ -100,7 +101,8 @@ def recv_data(socket : socket) -> tuple[int, int, int , bytes]:
     op_code = tuple[0]
 
     if op_code == ERROR_OP:
-        recv_error(req, socket)
+      recv_error(req)
+      raise IndexError
 
     if op_code != DATA_OP:
       send_error_block(PROTOCOL_ERR.format(DATA_OP, op_code), socket)
@@ -114,7 +116,8 @@ def recv_request(socket : socket) -> str:
     op_code = tuple[0]
 
     if op_code == ERROR_OP:
-        recv_error(req, socket)
+      recv_error(req)
+      raise IndexError
 
     if op_code != REQUET_FILE_OP:
       send_error_block(PROTOCOL_ERR.format(REQUET_FILE_OP, op_code), socket)
@@ -140,38 +143,54 @@ def get_command(line : str, client_socket : socket):
         print(GET_ERR2)
         return
 
-    send_request(server_file, client_socket)
-    
-    file = open(client_file, "wb")
-
-    expected_block = 0
-
-    while True:
-        (_, block, size, data) = recv_data(client_socket)
+    try:
+        send_request(server_file, client_socket)
         
-        if expected_block != block:
-            send_error_block(PROTOCOL_ERR, client_socket)
-            print(PROTOCOL_ERR)
-            close_program(client_socket)
+        file = open(client_file, "wb")
+
+        expected_block = 0
+
+        while True:
+            (_, block, size, data) = recv_data(client_socket)
             
-        send_acknowledge_block(block, client_socket)
-        file.write(data)
-        expected_block = expected_block + 1
-        if size < 512:
-            break
-        
-    file.close()
+            if expected_block != block:
+                send_error_block(PROTOCOL_ERR_BLOCK.format(expected_block, block), client_socket)
+            
+            send_acknowledge_block(block, client_socket)
+            file.write(data)
+            expected_block = expected_block + 1
+            if size < 512:
+                break
+            
+        file.close()
+    except IndexError:
+        os.remove(client_file)
+        close_program(client_socket)
+
+    print("File tranfer completed!!")
 
 def dir_command(client_socket : socket):
 
-    send_request("", client_socket)
+    try:
+        send_request("", client_socket)
 
-    while True:
-        (_, block, size, data) = recv_data(client_socket)
-        send_acknowledge_block(block, client_socket)
-        if size == 0:
-            break
-        print(data)
+        expected_block = 0
+
+        while True:
+            (_, block, size, data) = recv_data(client_socket)
+            send_acknowledge_block(block, client_socket)
+
+            if expected_block != block:
+                send_error_block(PROTOCOL_ERR_BLOCK.format(expected_block, block), client_socket)
+
+            expected_block = expected_block + 1
+
+            if size == 0:
+                break
+            print(data)
+            
+    except:
+        close_program(client_socket)
     
 
 def main():
