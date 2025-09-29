@@ -172,17 +172,19 @@ def dir_command(socket : socket):
 def get_command(fName : str, socket : socket):
     try: 
       f = open(fName, "rb")
-      data = f.read(SIZE)
       block = 0
 
 
       while True:
+        data = f.read(SIZE)
         send_data_block(block, len(data), data, socket)
         recv_acknowledge_block(block, socket)
         block = block + 1
-        data = f.read(SIZE)
-        if not data:
+        if not data or len(data) < SIZE:
            break
+          
+         
+
     except OSError:
        send_error_block(FILE_NOT_FOUND, socket)
 

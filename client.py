@@ -40,6 +40,7 @@ ACKNOWLEDGE_OP : int = 4
 ERROR_OP : int = 5
 
 ### Protocol
+PROTOCOL_ERR1 : str = "ERROR: Protocol Error connection closed"
 PROTOCOL_ERR : str = "ERROR: Protocol Error connection closed: Unexpected Op_code, expected -> {}, found -> {}"
 ACKNOWLEDGE_ERR : str = "ERROR: Incorrect Acknowledge packet, expected -> {}; found -> {}"
 
@@ -150,9 +151,8 @@ def get_command(line : str, client_socket : socket):
         (_, block, size, data) = recv_data(client_socket)
         
         if expected_block != block:
-            send_error_block(PROTOCOL_ERR, client_socket)
-            print(PROTOCOL_ERR)
-            close_program(client_socket)
+            print(PROTOCOL_ERR1)
+            send_error_block(PROTOCOL_ERR1, client_socket)
             
         send_acknowledge_block(block, client_socket)
         file.write(data)
@@ -161,6 +161,8 @@ def get_command(line : str, client_socket : socket):
             break
         
     file.close()
+
+    print("File tranfer completed!!")
 
 def dir_command(client_socket : socket):
 
