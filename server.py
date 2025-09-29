@@ -146,6 +146,8 @@ def handle_client(socket : socket, client_address : str, server_address : str):
      print("Client: {} has disconected or suffered an error".format(client_address))
   except BrokenPipeError:
      print("Client: {} has disconected or suffered an error".format(client_address))
+  except ConnectionResetError:
+     print("Client: {} has disconected or suffered an error".format(client_address))
      
     
 
@@ -183,8 +185,6 @@ def get_command(fName : str, socket : socket):
         if not data or len(data) < SIZE:
            break
           
-         
-
     except OSError:
        send_error_block(FILE_NOT_FOUND, socket)
 
