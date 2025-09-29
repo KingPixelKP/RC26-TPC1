@@ -136,13 +136,13 @@ def get_command(line : str, client_socket : socket):
     server_file : str = line.split()[1]
     client_file : str = line.split()[2]
 
-    if (os.path.isfile(client_file)):
+    if (os.path.exists(client_file)):
         print(GET_ERR2)
         return
 
     send_request(server_file, client_socket)
     
-    file = open(client_file, "w")
+    file = open(client_file, "wb")
 
     expected_block = 0
 
