@@ -1,3 +1,8 @@
+"""
+67775   Gabriel Matias
+68130   Dinis Neves
+"""
+
 import pickle
 from socket import *
 import sys
@@ -30,8 +35,7 @@ FAILED_CONNECT : str = "Unable to connect with the server"
 
 USER_INTERRUPT : str = "\nProgram interrupted by user closing connection."
 
-PROTOCOL_ERR : str = "ERROR: Protocol Error connection closed"
-ACKNOWLEDGE_ERR : str = "ERROR: Incorrect Acknowledge packet, expected -> {}; found -> {}"
+PROTOCOL_ERR : str = "ERROR: Protocol"
 
 ## OP Codes
 REQUET_FILE_OP : int = 1
@@ -40,14 +44,10 @@ ACKNOWLEDGE_OP : int = 4
 ERROR_OP : int = 5
 
 ### Protocol
-PROTOCOL_ERR_BLOCK : str = "ERROR: Protocol Error connection closed: Unexpected block, expected -> {}, found -> {}"
-PROTOCOL_ERR : str = "ERROR: Protocol Error connection closed: Unexpected Op_code, expected -> {}, found -> {}"
-ACKNOWLEDGE_ERR : str = "ERROR: Incorrect Acknowledge packet, expected -> {}; found -> {}"
 
 class ErrorException(Exception):
     def __init__(self):
         super().__init__(self)
-
 
 
 def close_program(socket : socket):
@@ -64,10 +64,10 @@ def send_error_block(error : str, socket : socket):
   err = pickle.dumps((ERROR_OP, error))
   socket.send(err)
   print(error)
-  raise IndexError
+  raise ErrorException
 
 
-def send_data_block(block : int, size : int, data : str, socket : socket):
+def send_data_block(block : int, size : int, data : bytes, socket : socket):
   data_tuple = (DATA_OP, block, size, data)
   dat = pickle.dumps(data_tuple)
   socket.send(dat)
@@ -88,12 +88,12 @@ def recv_acknowledge_block(block : int, socket : socket):
       raise ErrorException
   
   if op_code != ACKNOWLEDGE_OP:
-    send_error_block(PROTOCOL_ERR.format(ACKNOWLEDGE_OP, op_code), socket)
+    send_error_block(PROTOCOL_ERR, socket)
 
   (op_code, acknowledged_block) = pickle.loads(ack)
 
   if acknowledged_block != block:
-    send_error_block(ACKNOWLEDGE_ERR.format(block, acknowledged_block), socket)
+    send_error_block(PROTOCOL_ERR, socket)
 
 def recv_error(req : bytes):
     (_, error_string) = pickle.loads(req)
@@ -110,11 +110,11 @@ def recv_data(socket : socket) -> tuple[int, int, int , bytes]:
       raise ErrorException
 
     if op_code != DATA_OP:
-      send_error_block(PROTOCOL_ERR.format(DATA_OP, op_code), socket)
+      send_error_block(PROTOCOL_ERR, socket)
 
     return pickle.loads(req)
 
-def recv_request(socket : socket) -> str:
+def recv_request(socket : socket) -> str: ### Not needed here
     req = socket.recv(SOCKET_BUFFER)    
     tuple = pickle.loads(req)
 
@@ -125,7 +125,7 @@ def recv_request(socket : socket) -> str:
       raise ErrorException
 
     if op_code != REQUET_FILE_OP:
-      send_error_block(PROTOCOL_ERR.format(REQUET_FILE_OP, op_code), socket)
+      send_error_block(PROTOCOL_ERR, socket)
 
     (_, file_name) = pickle.loads(req)
 
@@ -155,6 +155,7 @@ def get_command(line : str, client_socket : socket):
         # and thus the server may think the file exists and thus transfer a file with nothing to the client, this assures that the client may only create the file after
         # receiving no errors (File not found)
 
+
         file = open(client_file, "wb")
 
         expected_block = 0
@@ -162,9 +163,11 @@ def get_command(line : str, client_socket : socket):
         while True:
             
             if expected_block != block:
-                send_error_block(PROTOCOL_ERR_BLOCK.format(expected_block, block), client_socket)
-            
+                send_error_block(PROTOCOL_ERR, client_socket)
+        
             send_acknowledge_block(block, client_socket)
+
+
             file.write(data)
             expected_block = expected_block + 1
             if size < 512:
@@ -195,7 +198,7 @@ def dir_command(client_socket : socket):
             send_acknowledge_block(block, client_socket)
 
             if expected_block != block:
-                send_error_block(PROTOCOL_ERR_BLOCK.format(expected_block, block), client_socket)
+                send_error_block(PROTOCOL_ERR, client_socket)
 
             expected_block = expected_block + 1
 
@@ -254,6 +257,7 @@ def main():
         print(FAILED_CONNECT)
         return
     print("Connection closed, client ended")
+    close_program(client_socket)
 
 if __name__ == "__main__":
     main()
